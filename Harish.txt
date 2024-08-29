@@ -1,0 +1,489 @@
+Certainly! I'll provide you with updated controller and service classes, along with the corresponding HTML, CSS, and JavaScript files for your social media application. Let's start with the updated controller and service classes, and then I'll provide the frontend files.
+
+First, let's update the controller classes:
+
+
+
+```java
+// UserController.java
+package com.example.socialmedia.controller;
+
+import com.example.socialmedia.model.User;
+import com.example.socialmedia.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.*;
+
+@Controller
+@RequestMapping("/users")
+public class UserController {
+    @Autowired
+    private UserService userService;
+
+    @GetMapping("/login")
+    public String loginPage() {
+        return "login";
+    }
+
+    @PostMapping("/login")
+    public String login(@RequestParam String username, @RequestParam String password, Model model) {
+        User user = userService.getUserByUsername(username);
+        if (user != null && user.getPassword().equals(password)) {
+            // In a real application, you should use proper authentication and session management
+            return "redirect:/posts";
+        } else {
+            model.addAttribute("error", "Invalid username or password");
+            return "login";
+        }
+    }
+
+    @GetMapping("/register")
+    public String registerPage() {
+        return "register";
+    }
+
+    @PostMapping("/register")
+    public String register(@ModelAttribute User user) {
+        userService.createUser(user);
+        return "redirect:/users/login";
+    }
+}
+
+// PostController.java
+package com.example.socialmedia.controller;
+
+import com.example.socialmedia.model.Post;
+import com.example.socialmedia.service.PostService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.*;
+
+@Controller
+@RequestMapping("/posts")
+public class PostController {
+    @Autowired
+    private PostService postService;
+
+    @GetMapping
+    public String getAllPosts(Model model) {
+        model.addAttribute("posts", postService.getAllPosts());
+        return "home";
+    }
+
+    @PostMapping
+    public String createPost(@ModelAttribute Post post) {
+        postService.createPost(post);
+        return "redirect:/posts";
+    }
+
+    @PostMapping("/{id}/like")
+    @ResponseBody
+    public int likePost(@PathVariable Long id, @RequestParam String username) {
+        return postService.likePost(id, username);
+    }
+}
+
+// CommentController.java
+package com.example.socialmedia.controller;
+
+import com.example.socialmedia.model.Comment;
+import com.example.socialmedia.service.CommentService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.*;
+
+@Controller
+@RequestMapping("/comments")
+public class CommentController {
+    @Autowired
+    private CommentService commentService;
+
+    @PostMapping
+    @ResponseBody
+    public Comment createComment(@ModelAttribute Comment comment) {
+        return commentService.createComment(comment);
+    }
+}
+
+// UserService.java
+package com.example.socialmedia.service;
+
+import com.example.socialmedia.model.User;
+import com.example.socialmedia.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+@Service
+public class UserService {
+    @Autowired
+    private UserRepository userRepository;
+
+    public User createUser(User user) {
+        return userRepository.save(user);
+    }
+
+    public User getUserByUsername(String username) {
+        return userRepository.findByUsername(username);
+    }
+}
+
+// PostService.java
+package com.example.socialmedia.service;
+
+import com.example.socialmedia.model.Post;
+import com.example.socialmedia.repository.PostRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Service
+public class PostService {
+    @Autowired
+    private PostRepository postRepository;
+
+    public Post createPost(Post post) {
+        post.setCreatedAt(LocalDateTime.now());
+        return postRepository.save(post);
+    }
+
+    public List<Post> getAllPosts() {
+        return postRepository.findAll();
+    }
+
+    public int likePost(Long id, String username) {
+        Post post = postRepository.findById(id).orElse(null);
+        if (post != null) {
+            if (!post.getLikedBy().contains(username)) {
+                post.getLikedBy().add(username);
+                post.setLikes(post.getLikes() + 1);
+                postRepository.save(post);
+            }
+            return post.getLikes();
+        }
+        return 0;
+    }
+}
+
+// CommentService.java
+package com.example.socialmedia.service;
+
+import com.example.socialmedia.model.Comment;
+import com.example.socialmedia.repository.CommentRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+
+@Service
+public class CommentService {
+    @Autowired
+    private CommentRepository commentRepository;
+
+    public Comment createComment(Comment comment) {
+        comment.setCreatedAt(LocalDateTime.now());
+        return commentRepository.save(comment);
+    }
+}
+
+```
+
+Now, let's create the HTML, CSS, and JavaScript files for the frontend:
+
+
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Social Media</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Login</h1>
+        <form action="/users/login" method="post">
+            <input type="text" name="username" placeholder="Username" required>
+            <input type="password" name="password" placeholder="Password" required>
+            <button type="submit">Login</button>
+        </form>
+        <p>Don't have an account? <a href="/users/register">Register</a></p>
+    </div>
+</body>
+</html>
+
+```
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - Social Media</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Register</h1>
+        <form action="/users/register" method="post">
+            <input type="text" name="username" placeholder="Username" required>
+            <input type="password" name="password" placeholder="Password" required>
+            <button type="submit">Register</button>
+        </form>
+        <p>Already have an account? <a href="/users/login">Login</a></p>
+    </div>
+</body>
+</html>
+
+```
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home - Social Media</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Social Media Feed</h1>
+        <form id="post-form">
+            <textarea name="content" placeholder="What's on your mind?" required></textarea>
+            <button type="submit">Post</button>
+        </form>
+        <div id="posts">
+            <!-- Posts will be dynamically added here -->
+        </div>
+    </div>
+    <script src="/js/script.js"></script>
+</body>
+</html>
+
+```
+
+```css
+body {
+    font-family: Arial, sans-serif;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+    background-color: #f4f4f4;
+}
+
+.container {
+    width: 80%;
+    margin: auto;
+    overflow: hidden;
+    padding: 20px;
+}
+
+h1 {
+    color: #333;
+}
+
+form {
+    background: #fff;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+input[type="text"],
+input[type="password"],
+textarea {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 10px;
+}
+
+button {
+    display: block;
+    width: 100%;
+    padding: 10px;
+    background: #333;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #555;
+}
+
+.post {
+    background: #fff;
+    padding: 20px;
+    margin-bottom: 20px;
+    border-radius: 5px;
+}
+
+.post .username {
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.post .content {
+    margin-bottom: 10px;
+}
+
+.post .actions {
+    display: flex;
+    justify-content: space-between;
+}
+
+.post .actions button {
+    width: 48%;
+}
+
+.comments {
+    margin-top: 10px;
+}
+
+.comment {
+    background: #f9f9f9;
+    padding: 10px;
+    margin-top: 5px;
+    border-radius: 3px;
+}
+
+```
+
+```javascript
+document.addEventListener('DOMContentLoaded', function() {
+    const postForm = document.getElementById('post-form');
+    const postsContainer = document.getElementById('posts');
+
+    loadPosts();
+
+    postForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const content = this.content.value;
+        createPost(content);
+        this.reset();
+    });
+
+    function loadPosts() {
+        fetch('/posts')
+            .then(response => response.json())
+            .then(posts => {
+                postsContainer.innerHTML = '';
+                posts.forEach(post => {
+                    const postElement = createPostElement(post);
+                    postsContainer.appendChild(postElement);
+                });
+            });
+    }
+
+    function createPost(content) {
+        fetch('/posts', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `content=${encodeURIComponent(content)}`
+        })
+        .then(() => loadPosts());
+    }
+
+    function createPostElement(post) {
+        const postElement = document.createElement('div');
+        postElement.className = 'post';
+        postElement.innerHTML = `
+            <div class="username">${post.user.username}</div>
+            <div class="content">${post.content}</div>
+            <div class="actions">
+                <button class="like-button" data-id="${post.id}">Like (${post.likes})</button>
+                <button class="comment-button" data-id="${post.id}">Comment</button>
+            </div>
+            <div class="comments">
+                ${post.comments.map(comment => `
+                    <div class="comment">
+                        <strong>${comment.user.username}:</strong> ${comment.content}
+                    </div>
+                `).join('')}
+            </div>
+            <form class="comment-form" data-id="${post.id}" style="display: none;">
+                <input type="text" name="content" placeholder="Write a comment..." required>
+                <button type="submit">Submit</button>
+            </form>
+        `;
+
+        const likeButton = postElement.querySelector('.like-button');
+        likeButton.addEventListener('click', function() {
+            likePost(post.id, this);
+        });
+
+        const commentButton = postElement.querySelector('.comment-button');
+        const commentForm = postElement.querySelector('.comment-form');
+        commentButton.addEventListener('click', function() {
+            commentForm.style.display = commentForm.style.display === 'none' ? 'block' : 'none';
+        });
+
+        commentForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const content = this.content.value;
+            createComment(post.id, content, postElement);
+            this.reset();
+            this.style.display = 'none';
+        });
+
+        return postElement;
+    }
+
+    function likePost(postId, button) {
+        fetch(`/posts/${postId}/like`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `username=${encodeURIComponent('currentUser')}` // Replace with actual logged-in username
+        })
+        .then(response => response.text())
+        .then(likes => {
+            button.textContent = `Like (${likes})`;
+        });
+    }
+
+    function createComment(postId, content, postElement) {
+        fetch('/comments', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `postId=${postId}&content=${encodeURIComponent(content)}&username=${encodeURIComponent('currentUser')}` // Replace with actual logged-in username
+        })
+        .then(response => response.json())
+        .then(comment => {
+            const commentsContainer = postElement.querySelector('.comments');
+            const commentElement = document.createElement('div');
+            commentElement.className = 'comment';
+            commentElement.innerHTML = `<strong>${comment.user.username}:</strong> ${comment.content}`;
+            commentsContainer.appendChild(commentElement);
+        });
+    }
+});
+
+```
+
+These files provide a basic frontend for your social media application. Here's a summary of the changes and additions:
+
+1. Updated controller classes to handle rendering HTML pages and processing form submissions.
+2. Modified service classes to support the new functionality (like liking posts with usernames).
+3. Created HTML files for login, register, and home pages.
+4. Added CSS styles for a clean and responsive design.
+5. Implemented JavaScript to handle dynamic post loading, liking, and commenting.
+
+To use these files:
+
+1. Place the HTML files in the `src/main/resources/templates` directory.
+2. Put the `styles.css` file in the `src/main/resources/static/css` directory.
+3. Place the `script.js` file in the `src/main/resources/static/js` directory.
+
+Make sure to update your `application.properties`
