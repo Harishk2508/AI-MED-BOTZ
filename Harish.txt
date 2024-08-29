@@ -487,3 +487,123 @@ To use these files:
 3. Place the `script.js` file in the `src/main/resources/static/js` directory.
 
 Make sure to update your `application.properties`
+
+
+I apologize for the oversight. It seems there was an error in the PostService class regarding the getLikedBy() method. Let's fix that issue in the PostService class and make sure the liking functionality works correctly.
+
+Here's the updated PostService class:
+
+```java
+package com.example.socialmedia.service;
+
+import com.example.socialmedia.model.Post;
+import com.example.socialmedia.repository.PostRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+@Service
+public class PostService {
+    @Autowired
+    private PostRepository postRepository;
+
+    public Post createPost(Post post) {
+        post.setCreatedAt(LocalDateTime.now());
+        post.setLikes(0);
+        post.setLikedBy(new ArrayList<>()); // Initialize likedBy list
+        return postRepository.save(post);
+    }
+
+    public List<Post> getAllPosts() {
+        return postRepository.findAll();
+    }
+
+    public int likePost(Long id, String username) {
+        Post post = postRepository.findById(id).orElse(null);
+        if (post != null) {
+            List<String> likedBy = post.getLikedBy();
+            if (likedBy == null) {
+                likedBy = new ArrayList<>();
+                post.setLikedBy(likedBy);
+            }
+            if (!likedBy.contains(username)) {
+                likedBy.add(username);
+                post.setLikes(post.getLikes() + 1);
+                postRepository.save(post);
+            }
+            return post.getLikes();
+        }
+        return 0;
+    }
+}
+
+```
+
+Now, let's make sure the Post model class has the likedBy field:
+
+```java
+package com.example.socialmedia.model;
+
+import javax.persistence.*;
+import lombok.Data;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.ArrayList;
+
+@Data
+@Entity
+@Table(name = "posts")
+public class Post {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false)
+    private String content;
+
+    @Column(nullable = false)
+    private LocalDateTime createdAt;
+
+    @ManyToOne
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL)
+    private List<Comment> comments = new ArrayList<>();
+
+    private int likes;
+
+    @ElementCollection
+    @CollectionTable(name = "post_liked_by", joinColumns = @JoinColumn(name = "post_id"))
+    @Column(name = "username")
+    private List<String> likedBy = new ArrayList<>();
+}
+
+```
+
+These changes should resolve the "getLikedBy() throws error undefined" issue. Here's what we did:
+
+1. In the PostService class:
+   - We initialize the likedBy list when creating a new post.
+   - In the likePost method, we check if likedBy is null and initialize it if necessary.
+   - We use the likedBy list to check if a user has already liked the post.
+
+2. In the Post model class:
+   - We added the likedBy field as a List<String> with proper JPA annotations to create a separate table for storing usernames who liked the post.
+   - We initialize the comments and likedBy lists to avoid null pointer exceptions.
+
+Make sure to update your database schema or use the appropriate JPA settings to automatically update the schema based on these changes.
+
+Now the liking functionality should work correctly. Users can like a post once, and the system will keep track of who liked each post.
+
+If you're still encountering issues, please make sure that:
+
+1. Your frontend JavaScript is correctly sending the username when liking a post.
+2. The PostController is properly calling the PostService's likePost method.
+3. Your database configuration allows for creating new tables and columns as needed.
+
+If you need any further assistance or if you're still facing issues, please let me know, and I'll be happy to help you troubleshoot further.
+
