@@ -1,0 +1,1146 @@
+Certainly! I'll provide you with all the code files in an organized manner, including both the original and updated versions where applicable. Here's a comprehensive list of all the files for your PG website project:
+
+1. Backend (Java) Files:
+
+
+
+```java
+package com.example.pgwebsite;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class PgwebsiteApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(PgwebsiteApplication.class, args);
+    }
+}
+
+```
+
+
+
+```java
+package com.example.pgwebsite.entity;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
+
+@Entity
+@Table(name = "users")
+public class User {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @NotBlank
+    @Column(unique = true)
+    private String username;
+
+    @NotBlank
+    @Email
+    @Column(unique = true)
+    private String email;
+
+    @NotBlank
+    @Size(min = 12, max = 12)
+    @Column(unique = true)
+    private String aadharNumber;
+
+    @NotBlank
+    @Pattern(regexp = "^\\d{10}$")
+    private String phoneNumber;
+
+    @NotBlank
+    private String city;
+
+    @NotBlank
+    private String password;
+
+    // Getters and setters
+}
+
+```
+
+```java
+package com.example.pgwebsite.entity;
+
+import jakarta.persistence.*;
+import java.math.BigDecimal;
+
+@Entity
+@Table(name = "rooms")
+public class Room {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false)
+    private String name;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private RoomType type;
+
+    @Column(nullable = false)
+    private Integer sharing;
+
+    @Column(nullable = false)
+    private BigDecimal costPerPerson;
+
+    public enum RoomType {
+        AC, NON_AC, PRIVATE
+    }
+
+    // Getters and setters
+}
+
+```
+
+```java
+package com.example.pgwebsite.entity;
+
+import jakarta.persistence.*;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
+@Entity
+@Table(name = "bookings")
+public class Booking {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @ManyToOne
+    @JoinColumn(name = "room_id", nullable = false)
+    private Room room;
+
+    @Column(nullable = false)
+    private Integer numberOfPersons;
+
+    @Column(nullable = false)
+    private BigDecimal totalAmount;
+
+    @Column(nullable = false)
+    private LocalDate checkInDate;
+
+    @Column(nullable = false)
+    private LocalDate checkOutDate;
+
+    // Getters and setters
+}
+
+```
+
+
+
+```java
+package com.example.pgwebsite.repository;
+
+import com.example.pgwebsite.entity.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.Optional;
+
+public interface UserRepository extends JpaRepository<User, Long> {
+    Optional<User> findByUsername(String username);
+    Optional<User> findByEmail(String email);
+    boolean existsByUsername(String username);
+    boolean existsByEmail(String email);
+}
+
+```
+
+```java
+package com.example.pgwebsite.repository;
+
+import com.example.pgwebsite.entity.Room;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface RoomRepository extends JpaRepository<Room, Long> {
+}
+
+```
+
+```java
+package com.example.pgwebsite.repository;
+
+import com.example.pgwebsite.entity.Booking;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface BookingRepository extends JpaRepository<Booking, Long> {
+}
+
+```
+
+
+
+```java
+package com.example.pgwebsite.service;
+
+import com.example.pgwebsite.entity.User;
+import com.example.pgwebsite.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+@Service
+public class UserService {
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    public User registerUser(User user) {
+        if (userRepository.existsByUsername(user.getUsername())) {
+            throw new RuntimeException("Username already exists");
+        }
+        if (userRepository.existsByEmail(user.getEmail())) {
+            throw new RuntimeException("Email already exists");
+        }
+        user.setPassword(passwordEncoder.encode(user.getPassword()));
+        return userRepository.save(user);
+    }
+
+    public User findByUsername(String username) {
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+    }
+}
+
+```
+
+```java
+package com.example.pgwebsite.service;
+
+import com.example.pgwebsite.entity.Room;
+import com.example.pgwebsite.repository.RoomRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class RoomService {
+
+    @Autowired
+    private RoomRepository roomRepository;
+
+    public List<Room> getAllRooms() {
+        return roomRepository.findAll();
+    }
+
+    public Room getRoomById(Long id) {
+        return roomRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Room not found"));
+    }
+}
+
+```
+
+```java
+package com.example.pgwebsite.service;
+
+import com.example.pgwebsite.entity.Booking;
+import com.example.pgwebsite.entity.Room;
+import com.example.pgwebsite.entity.User;
+import com.example.pgwebsite.repository.BookingRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+
+@Service
+public class BookingService {
+
+    @Autowired
+    private BookingRepository bookingRepository;
+
+    @Autowired
+    private UserService userService;
+
+    @Autowired
+    private RoomService roomService;
+
+    public Booking createBooking(String username, Long roomId, Integer numberOfPersons, LocalDate checkInDate, LocalDate checkOutDate) {
+        User user = userService.findByUsername(username);
+        Room room = roomService.getRoomById(roomId);
+
+        BigDecimal totalAmount = calculateTotalAmount(room, numberOfPersons, checkInDate, checkOutDate);
+
+        Booking booking = new Booking();
+        booking.setUser(user);
+        booking.setRoom(room);
+        booking.setNumberOfPersons(numberOfPersons);
+        booking.setTotalAmount(totalAmount);
+        booking.setCheckInDate(checkInDate);
+        booking.setCheckOutDate(checkOutDate);
+
+        return bookingRepository.save(booking);
+    }
+
+    private BigDecimal calculateTotalAmount(Room room, Integer numberOfPersons, LocalDate checkInDate, LocalDate checkOutDate) {
+        long days = ChronoUnit.DAYS.between(checkInDate, checkOutDate);
+        BigDecimal baseAmount = room.getCostPerPerson().multiply(BigDecimal.valueOf(numberOfPersons));
+
+        if (days < 30) {
+            return baseAmount.add(BigDecimal.valueOf(50).multiply(BigDecimal.valueOf(days)));
+        } else {
+            return baseAmount.multiply(BigDecimal.valueOf(days / 30));
+        }
+    }
+}
+
+```
+
+
+
+```java
+package com.example.pgwebsite.controller;
+
+import com.example.pgwebsite.entity.User;
+import com.example.pgwebsite.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/users")
+public class UserController {
+
+    @Autowired
+    private UserService userService;
+
+    @PostMapping("/register")
+    public ResponseEntity<?> registerUser(@RequestBody User user) {
+        try {
+            User registeredUser = userService.registerUser(user);
+            return ResponseEntity.ok(registeredUser);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+}
+
+```
+
+```java
+package com.example.pgwebsite.controller;
+
+import com.example.pgwebsite.entity.Room;
+import com.example.pgwebsite.service.RoomService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/rooms")
+public class RoomController {
+
+    @Autowired
+    private RoomService roomService;
+
+    @GetMapping
+    public ResponseEntity<List<Room>> getAllRooms() {
+        return ResponseEntity.ok(roomService.getAllRooms());
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<Room> getRoomById(@PathVariable Long id) {
+        try {
+            Room room = roomService.getRoomById(id);
+            return ResponseEntity.ok(room);
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+}
+
+```
+
+```java
+package com.example.pgwebsite.controller;
+
+import com.example.pgwebsite.entity.Booking;
+import com.example.pgwebsite.service.BookingService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
+
+@RestController
+@RequestMapping("/api/bookings")
+public class BookingController {
+
+    @Autowired
+    private BookingService bookingService;
+
+    @PostMapping
+    public ResponseEntity<?> createBooking(@RequestParam String username,
+                                           @RequestParam Long roomId,
+                                           @RequestParam Integer numberOfPersons,
+                                           @RequestParam LocalDate checkInDate,
+                                           @RequestParam LocalDate checkOutDate) {
+        try {
+            Booking booking = bookingService.createBooking(username, roomId, numberOfPersons, checkInDate, checkOutDate);
+            return ResponseEntity.ok(booking);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+}
+
+```
+
+
+Certainly! I'll provide you with the front-end code for your PG website project, along with instructions on how to structure it in your project directory. We'll use HTML, CSS, and JavaScript to create the user interface that interacts with the backend we've already set up.
+
+Let's start by creating the directory structure for your front-end files:
+
+1. In your Eclipse project, create a new folder structure:
+   src/main/resources/static/
+   
+2. Inside the 'static' folder, create the following structure:
+   - css/
+   - js/
+   - images/ (for any images you might want to add later)
+
+3. In the 'static' folder, we'll create our HTML files.
+
+Now, let's create the necessary files:
+
+1. Register Page (register.html):
+
+
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - PG Website</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Register</h1>
+        <form id="registerForm">
+            <input type="text" id="username" placeholder="Username" required>
+            <input type="email" id="email" placeholder="Email" required>
+            <input type="text" id="aadharNumber" placeholder="Aadhar Number" required>
+            <input type="tel" id="phoneNumber" placeholder="Phone Number" required>
+            <input type="text" id="city" placeholder="City" required>
+            <input type="password" id="password" placeholder="Password" required>
+            <button type="submit">Register</button>
+        </form>
+        <p>Already have an account? <a href="login.html">Login here</a></p>
+    </div>
+    <script src="/js/register.js"></script>
+</body>
+</html>
+
+```
+
+2. Login Page (login.html):
+
+
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - PG Website</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Login</h1>
+        <form id="loginForm">
+            <input type="text" id="username" placeholder="Username" required>
+            <input type="password" id="password" placeholder="Password" required>
+            <button type="submit">Login</button>
+        </form>
+        <p>Don't have an account? <a href="register.html">Register here</a></p>
+    </div>
+    <script src="/js/login.js"></script>
+</body>
+</html>
+
+```
+
+3. Home Page (home.html):
+
+
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home - PG Website</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Welcome to PG Website</h1>
+        <div id="roomList"></div>
+    </div>
+    <script src="/js/home.js"></script>
+</body>
+</html>
+
+```
+
+4. Booking Page (booking.html):
+
+
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking - PG Website</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Room Booking</h1>
+        <form id="bookingForm">
+            <p>User: <span id="userName"></span></p>
+            <p>Room: <span id="roomName"></span></p>
+            <input type="number" id="numberOfPersons" placeholder="Number of Persons" required>
+            <input type="date" id="checkInDate" required>
+            <input type="date" id="checkOutDate" required>
+            <p>Total Amount: $<span id="totalAmount">0</span></p>
+            <button type="submit">Confirm Booking</button>
+            <button type="button" id="cancelBooking">Cancel</button>
+        </form>
+    </div>
+    <script src="/js/booking.js"></script>
+</body>
+</html>
+
+```
+
+5. Success Page (success.html):
+
+
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking Successful - PG Website</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Booking Confirmation</h1>
+        <div id="bookingDetails"></div>
+        <a href="home.html">Return to Home</a>
+    </div>
+    <script src="/js/success.js"></script>
+</body>
+</html>
+
+```
+
+Now, let's create the CSS file (styles.css) in the css folder:
+
+
+
+```css
+body {
+    font-family: Arial, sans-serif;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+    background-color: #f4f4f4;
+}
+
+.container {
+    width: 80%;
+    margin: auto;
+    overflow: hidden;
+    padding: 20px;
+}
+
+h1 {
+    color: #333;
+    text-align: center;
+}
+
+form {
+    background: #fff;
+    padding: 20px;
+    border-radius: 5px;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="tel"],
+input[type="number"],
+input[type="date"] {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+button {
+    display: block;
+    width: 100%;
+    padding: 10px;
+    background: #333;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #555;
+}
+
+.room-card {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.room-card h2 {
+    margin-top: 0;
+}
+
+#bookingDetails {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 15px;
+    margin-top: 20px;
+}
+
+```
+
+Now, let's create the JavaScript files in the js folder:
+
+1. register.js:
+
+
+
+```javascript
+document.getElementById('registerForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const userData = {
+        username: document.getElementById('username').value,
+        email: document.getElementById('email').value,
+        aadharNumber: document.getElementById('aadharNumber').value,
+        phoneNumber: document.getElementById('phoneNumber').value,
+        city: document.getElementById('city').value,
+        password: document.getElementById('password').value
+    };
+
+    fetch('/api/users/register', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userData),
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.id) {
+            alert('Registration successful!');
+            window.location.href = 'login.html';
+        } else {
+            alert('Registration failed: ' + data);
+        }
+    })
+    .catch((error) => {
+        console.error('Error:', error);
+        alert('An error occurred during registration.');
+    });
+});
+
+```
+
+2. login.js:
+
+
+
+```javascript
+document.getElementById('loginForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const loginData = {
+        username: document.getElementById('username').value,
+        password: document.getElementById('password').value
+    };
+
+    // In a real application, you would send this data to your server for authentication
+    // For this example, we'll just simulate a successful login
+    localStorage.setItem('currentUser', loginData.username);
+    window.location.href = 'home.html';
+});
+
+```
+
+3. home.js:
+
+
+
+```javascript
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if user is logged in
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) {
+        window.location.href = 'login.html';
+        return;
+    }
+
+    // Fetch rooms from the server
+    fetch('/api/rooms')
+        .then(response => response.json())
+        .then(rooms => {
+            const roomList = document.getElementById('roomList');
+            rooms.forEach(room => {
+                const roomCard = document.createElement('div');
+                roomCard.className = 'room-card';
+                roomCard.innerHTML = `
+                    <h2>${room.name}</h2>
+                    <p>Type: ${room.type}</p>
+                    <p>Sharing: ${room.sharing}</p>
+                    <p>Cost per person: $${room.costPerPerson}</p>
+                    <button onclick="bookRoom(${room.id})">Book</button>
+                `;
+                roomList.appendChild(roomCard);
+            });
+        })
+        .catch(error => console.error('Error:', error));
+});
+
+function bookRoom(roomId) {
+    localStorage.setItem('selectedRoomId', roomId);
+    window.location.href = 'booking.html';
+}
+
+```
+
+4. booking.js:
+
+
+
+```javascript
+document.addEventListener('DOMContentLoaded', function() {
+    const currentUser = localStorage.getItem('currentUser');
+    const selectedRoomId = localStorage.getItem('selectedRoomId');
+
+    if (!currentUser || !selectedRoomId) {
+        window.location.href = 'home.html';
+        return;
+    }
+
+    document.getElementById('userName').textContent = currentUser;
+
+    fetch(`/api/rooms/${selectedRoomId}`)
+        .then(response => response.json())
+        .then(room => {
+            document.getElementById('roomName').textContent = room.name;
+        })
+        .catch(error => console.error('Error:', error));
+
+    document.getElementById('bookingForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const bookingData = {
+            username: currentUser,
+            roomId: selectedRoomId,
+            numberOfPersons: document.getElementById('numberOfPersons').value,
+            checkInDate: document.getElementById('checkInDate').value,
+            checkOutDate: document.getElementById('checkOutDate').value
+        };
+
+        fetch('/api/bookings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(bookingData),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.id) {
+                localStorage.setItem('bookingDetails', JSON.stringify(data));
+                window.location.href = 'success.html';
+            } else {
+                alert('Booking failed: ' + data);
+            }
+        })
+        .catch((error) => {
+            console.error('Error:', error);
+            alert('An error occurred during booking.');
+        });
+    });
+
+    document.getElementById('cancelBooking').addEventListener('click', function() {
+        window.location.href = 'home.html';
+    });
+});
+
+```
+
+5. success.js:
+
+
+
+```javascript
+document.addEventListener('DOMContentLoaded', function() {
+    const bookingDetails = JSON.parse(localStorage.getItem('bookingDetails'));
+
+    if (!bookingDetails) {
+        window.location.href = 'home.html';
+        return;
+    }
+
+    const detailsDiv = document.getElementById('bookingDetails');
+    detailsDiv.innerHTML = `
+        <p>Name: ${bookingDetails.user.username}</p>
+        <p>Room: ${bookingDetails.room.name}</p>
+        <p>Room Type: ${bookingDetails.room.type}</p>
+        <p>Check-in Date: ${bookingDetails.checkInDate}</p>
+        <p>Check-out Date: ${bookingDetails.checkOutDate}</p>
+        <p>Booking Confirmation: Successful</p>
+    `;
+
+    // Clear the booking details from local storage
+    localStorage.removeItem('bookingDetails');
+    localStorage.removeItem('selectedRoomId');
+});
+
+```
+
+To integrate these front-end files with your Spring Boot
+
+
+
+
+
+I apologize for the oversight. You're right, and I'll provide updated code that aligns with the functionalities you specified earlier. Let's update the home page and related components to include the required room details and functionalities.
+
+Let's start by updating the home.html file:
+
+
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home - PG Website</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Welcome to PG Website</h1>
+        <p>Welcome, <span id="userName"></span>!</p>
+        <h2>Available Rooms</h2>
+        <table id="roomTable">
+            <thead>
+                <tr>
+                    <th>Room Name</th>
+                    <th>Room Type</th>
+                    <th>AC/Non-AC</th>
+                    <th>Number of Sharing</th>
+                    <th>Cost per Person</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="roomList">
+                <!-- Room data will be inserted here -->
+            </tbody>
+        </table>
+    </div>
+    <script src="/js/home.js"></script>
+</body>
+</html>
+
+```
+
+Now, let's update the home.js file to fetch and display the room details:
+
+
+
+```javascript
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if user is logged in
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) {
+        window.location.href = 'login.html';
+        return;
+    }
+
+    // Display user name
+    document.getElementById('userName').textContent = currentUser;
+
+    // Fetch rooms from the server
+    fetch('/api/rooms')
+        .then(response => response.json())
+        .then(rooms => {
+            const roomList = document.getElementById('roomList');
+            rooms.forEach(room => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${room.name}</td>
+                    <td>${room.type}</td>
+                    <td>${room.type.includes('AC') ? 'AC' : 'Non-AC'}</td>
+                    <td>${room.sharing}</td>
+                    <td>$${room.costPerPerson}</td>
+                    <td><button onclick="bookRoom(${room.id})">Book</button></td>
+                `;
+                roomList.appendChild(row);
+            });
+        })
+        .catch(error => console.error('Error:', error));
+});
+
+function bookRoom(roomId) {
+    localStorage.setItem('selectedRoomId', roomId);
+    window.location.href = 'booking.html';
+}
+
+```
+
+Now, let's update the booking.html file to include the additional fields:
+
+
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking - PG Website</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Room Booking</h1>
+        <form id="bookingForm">
+            <p>User: <span id="userName"></span></p>
+            <p>Room: <span id="roomName"></span></p>
+            <p>Room Type: <span id="roomType"></span></p>
+            <p>AC/Non-AC: <span id="roomAC"></span></p>
+            <p>Number of Sharing: <span id="roomSharing"></span></p>
+            <p>Cost per Person: $<span id="costPerPerson"></span></p>
+            <input type="number" id="numberOfPersons" placeholder="Number of Persons" required>
+            <input type="date" id="checkInDate" required>
+            <input type="date" id="checkOutDate" required>
+            <p>Total Amount: $<span id="totalAmount">0</span></p>
+            <button type="submit">Confirm Booking</button>
+            <button type="button" id="cancelBooking">Cancel</button>
+        </form>
+    </div>
+    <script src="/js/booking.js"></script>
+</body>
+</html>
+
+```
+
+Now, let's update the booking.js file to handle the new fields and calculate the total amount:
+
+
+
+```javascript
+document.addEventListener('DOMContentLoaded', function() {
+    const currentUser = localStorage.getItem('currentUser');
+    const selectedRoomId = localStorage.getItem('selectedRoomId');
+
+    if (!currentUser || !selectedRoomId) {
+        window.location.href = 'home.html';
+        return;
+    }
+
+    document.getElementById('userName').textContent = currentUser;
+
+    let roomData;
+
+    fetch(`/api/rooms/${selectedRoomId}`)
+        .then(response => response.json())
+        .then(room => {
+            roomData = room;
+            document.getElementById('roomName').textContent = room.name;
+            document.getElementById('roomType').textContent = room.type;
+            document.getElementById('roomAC').textContent = room.type.includes('AC') ? 'AC' : 'Non-AC';
+            document.getElementById('roomSharing').textContent = room.sharing;
+            document.getElementById('costPerPerson').textContent = room.costPerPerson;
+        })
+        .catch(error => console.error('Error:', error));
+
+    function calculateTotalAmount() {
+        const numberOfPersons = document.getElementById('numberOfPersons').value;
+        const checkInDate = new Date(document.getElementById('checkInDate').value);
+        const checkOutDate = new Date(document.getElementById('checkOutDate').value);
+        
+        if (numberOfPersons && checkInDate && checkOutDate && roomData) {
+            const days = (checkOutDate - checkInDate) / (1000 * 60 * 60 * 24);
+            let totalAmount = roomData.costPerPerson * numberOfPersons;
+
+            if (days < 30) {
+                totalAmount += 50 * days; // Add 50 per day for stays less than a month
+            } else {
+                totalAmount *= Math.ceil(days / 30); // Multiply by number of months for longer stays
+            }
+
+            document.getElementById('totalAmount').textContent = totalAmount.toFixed(2);
+        }
+    }
+
+    document.getElementById('numberOfPersons').addEventListener('input', calculateTotalAmount);
+    document.getElementById('checkInDate').addEventListener('input', calculateTotalAmount);
+    document.getElementById('checkOutDate').addEventListener('input', calculateTotalAmount);
+
+    document.getElementById('bookingForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const bookingData = {
+            username: currentUser,
+            roomId: selectedRoomId,
+            numberOfPersons: document.getElementById('numberOfPersons').value,
+            checkInDate: document.getElementById('checkInDate').value,
+            checkOutDate: document.getElementById('checkOutDate').value,
+            totalAmount: document.getElementById('totalAmount').textContent
+        };
+
+        fetch('/api/bookings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(bookingData),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.id) {
+                localStorage.setItem('bookingDetails', JSON.stringify(data));
+                window.location.href = 'success.html';
+            } else {
+                alert('Booking failed: ' + data);
+            }
+        })
+        .catch((error) => {
+            console.error('Error:', error);
+            alert('An error occurred during booking.');
+        });
+    });
+
+    document.getElementById('cancelBooking').addEventListener('click', function() {
+        window.location.href = 'home.html';
+    });
+});
+
+```
+
+Finally, let's update the success.html and success.js files to display all the booking details:
+
+
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking Successful - PG Website</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Booking Confirmation</h1>
+        <div id="bookingDetails"></div>
+        <a href="home.html">Return to Home</a>
+    </div>
+    <script src="/js/success.js"></script>
+</body>
+</html>
+
+```
+
+
+
+```javascript
+document.addEventListener('DOMContentLoaded', function() {
+    const bookingDetails = JSON.parse(localStorage.getItem('bookingDetails'));
+
+    if (!bookingDetails) {
+        window.location.href = 'home.html';
+        return;
+    }
+
+    const detailsDiv = document.getElementById('bookingDetails');
+    detailsDiv.innerHTML = `
+        <p>Name: ${bookingDetails.user.username}</p>
+        <p>Room: ${bookingDetails.room.name}</p>
+        <p>Room Type: ${bookingDetails.room.type}</p>
+        <p>AC/Non-AC: ${bookingDetails.room.type.includes('AC') ? 'AC' : 'Non-AC'}</p>
+        <p>Number of Sharing: ${bookingDetails.room.sharing}</p>
+        <p>Number of Persons: ${bookingDetails.numberOfPersons}</p>
+        <p>Check-in Date: ${bookingDetails.checkInDate}</p>
+        <p>Check-out Date: ${bookingDetails.checkOutDate}</p>
+        <p>Total Amount: $${bookingDetails.totalAmount}</p>
+        <p>Booking Confirmation: Successful</p>
+    `;
+
+    // Clear the booking details from local storage
+    localStorage.removeItem('bookingDetails');
+    localStorage.removeItem('selectedRoomId');
+});
+
+```
+
+These updates should provide the functionality you described, including:
+
+1. Displaying room details (name, type, AC/Non-AC, number of sharing, cost per person) on the home page.
+2. A "Book" button for each room that redirects to the booking page.
+3. Calculating the total amount based on the number of persons and the duration of stay.
+4. Displaying all relevant details on the booking confirmation page.
+
+To integrate these front-end files with your Spring Boot project:
+
+1. Place all HTML files in the `src/main/resources/static/` directory.
+2. Create a `css` folder in the `static` directory and place the `styles.css` file there.
+3. Create a `js` folder in the `static` directory and place all JavaScript files there.
+
+Make sure your Spring Boot backend is set up to handle the API endpoints (/api/rooms, /api/bookings) that these front-end files are expecting to interact with.
+
+Is there anything else you'd like me to explain or modify in these front-end components?
