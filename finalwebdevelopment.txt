@@ -1,3 +1,25 @@
+# Database Configuration
+spring.datasource.url=jdbc:mysql://localhost:3306/pgwebsite
+spring.datasource.username=your_username
+spring.datasource.password=your_password
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+
+# JPA Configuration
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQLDialect
+
+# Server Configuration
+server.port=8080
+
+# Security Configuration
+spring.security.user.name=admin
+spring.security.user.password=admin
+
+
+
+
+
 Certainly! I'll provide you with all the code files in an organized manner, including both the original and updated versions where applicable. Here's a comprehensive list of all the files for your PG website project:
 
 1. Backend (Java) Files:
